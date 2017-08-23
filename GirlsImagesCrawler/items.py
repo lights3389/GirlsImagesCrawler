@@ -26,6 +26,8 @@ class GirlsimagescrawlerItem(scrapy.Item):
     crawl_date = scrapy.Field()
     hotness = scrapy.Field()
     index_url = scrapy.Field()
+    index_image_url =scrapy.Field()
     tags = scrapy.Field()
     image_counts = scrapy.Field()
     image_urls = scrapy.Field()
+    download_results = scrapy.Field()

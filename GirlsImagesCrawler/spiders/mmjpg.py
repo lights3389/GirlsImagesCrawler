@@ -23,30 +23,41 @@ class MmjpgSpider(scrapy.Spider):
         for item in imageLiList:
             title = item.xpath('.//img/@alt').extract()[0]
             index_url = item.xpath('.//a/@href').extract()[0]
-            crawl_date = datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')
-            girlsImgItem = GirlsimagescrawlerItem(title=title, index_url=index_url, crawl_date=crawl_date)
-            req = scrapy.Request(url=index_url, callback=self.parse_detail)
-            req.meta['girlsImgItem'] = girlsImgItem
+            index_image_url = item.xpath('.//img/@src').extract()
+            crawl_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            imageItem = GirlsimagescrawlerItem(title=title, index_url=index_url, index_image_url=index_image_url, crawl_date=crawl_date)
+            req = scrapy.Request(url=index_url, callback=self.parse_item_info)
+            req.meta['imageItem'] = imageItem
             yield req
         next_page = Selector(response).re(self.regex_next_page)
         if next_page:
             next_page_url = self.start_urls[0] + next_page[0]
             yield scrapy.Request(url=next_page_url, callback=self.parse)
 
-    def parse_detail(self, response):
+    def parse_item_info(self, response):
         """解析更多详细信息
         :param response:
         :return:
         """
-        girlsImgItem = response.meta['girlsImgItem']
-        girlsImgItem['pub_date'] = response.css('div.info')[0].re(self.regex_pub_date)[0]
-        girlsImgItem['hotness'] = int(response.css('div.info')[0].re(self.regex_hotness)[0])
-        girlsImgItem['tags'] = response.css('div.tags a').xpath('./text()').extract()
-        girlsImgItem['image_counts'] = int(eval(response.css('div.clearfloat')[0].re(self.regex_picinfo)[0])[2])
-        image_urls = []
-        for i in range(1, girlsImgItem['image_counts']+1):
-            image_urls.append(girlsImgItem['index_url'] + '/' + str(i))
-        girlsImgItem['image_urls'] = image_urls
-        yield girlsImgItem
+        imageItem = response.meta['imageItem']
+        imageItem['pub_date'] = response.css('div.info')[0].re(self.regex_pub_date)[0]
+        imageItem['hotness'] = int(response.css('div.info')[0].re(self.regex_hotness)[0])
+        imageItem['tags'] = response.css('div.tags a').xpath('./text()').extract()
+        imageItem['image_counts'] = int(eval(response.css('div.clearfloat')[0].re(self.regex_picinfo)[0])[2])
+        imageItem['image_urls'] = []
+        for counter in range(1, imageItem['image_counts']+1):
+            page_url = imageItem['index_url'] + '/' + str(counter)
+            yield scrapy.Request(url=page_url,callback=self.parse_item_img_url,meta={'imageItem':imageItem})
+
+    def parse_item_img_url(self, response):
+        """继续寻找每个item下 的每个图片地址，并添加到集合中
+        :param response:
+        :return:
+        """
+        imageItem = response.meta['imageItem']
+        image_url = response.css('div#content img').xpath('./@src').extract()[0]
+        imageItem['image_urls'].append(image_url)
+        if len(imageItem['image_urls']) == imageItem['image_counts']:
+            yield imageItem
 
 
